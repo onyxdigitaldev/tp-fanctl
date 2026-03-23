@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "configure" ]; then
+    cp /etc/thinkfan.yaml /etc/thinkfan-active.yaml 2>/dev/null || true
+
+    if [ ! -f /etc/modprobe.d/thinkfan.conf ] || ! grep -q "fan_control=1" /etc/modprobe.d/thinkfan.conf 2>/dev/null; then
+        mkdir -p /etc/modprobe.d
+        echo "options thinkpad_acpi fan_control=1" > /etc/modprobe.d/thinkfan.conf
+    fi
+
+    mkdir -p /etc/systemd/system/thinkfan.service.d
+    cat > /etc/systemd/system/thinkfan.service.d/override.conf << 'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/sbin/thinkfan -c /etc/thinkfan-active.yaml
+EOF
+fi
+
+#DEBHELPER#

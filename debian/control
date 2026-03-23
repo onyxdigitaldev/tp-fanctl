@@ -1,0 +1,22 @@
+Source: tp-fanctl
+Section: utils
+Priority: optional
+Maintainer: Onyx Digital <dev@onyxdigital.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/onyxdigitaldev/tp-fanctl
+Rules-Requires-Root: no
+
+Package: tp-fanctl
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.10), thinkfan
+Recommends: python3-gi, gir1.2-appindicator3-0.1
+Description: Adaptive fan controller for ThinkPad laptops
+ Automatically switches between quiet and gaming fan profiles based on
+ CPU load. Built on top of thinkfan with hysteresis to prevent thrashing.
+ .
+ Features:
+  - Asymmetric thresholds: fast ramp-up (12s), slow cooldown (30s)
+  - System tray applet with manual override
+  - Profile switching via SIGHUP (no fan reset)
+  - Clean shutdown restores BIOS fan control

@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -Dm 755 bin/tp-fanctl $(CURDIR)/debian/tp-fanctl/usr/bin/tp-fanctl
+	install -Dm 755 bin/tp-fanctl-tray $(CURDIR)/debian/tp-fanctl/usr/bin/tp-fanctl-tray
+	install -Dm 755 bin/tp-fanctl-gaming $(CURDIR)/debian/tp-fanctl/usr/bin/tp-fanctl-gaming
+	install -Dm 755 bin/tp-fanctl-quiet $(CURDIR)/debian/tp-fanctl/usr/bin/tp-fanctl-quiet
+	install -Dm 644 config/thinkfan-quiet.yaml $(CURDIR)/debian/tp-fanctl/etc/thinkfan.yaml
+	install -Dm 644 config/thinkfan-gaming.yaml $(CURDIR)/debian/tp-fanctl/etc/thinkfan-gaming.yaml
+	install -Dm 644 systemd/tp-fanctl.service $(CURDIR)/debian/tp-fanctl/lib/systemd/system/tp-fanctl.service
+	install -Dm 644 systemd/tp-fanctl-tray.desktop $(CURDIR)/debian/tp-fanctl/etc/xdg/autostart/tp-fanctl-tray.desktop
