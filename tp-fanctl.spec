@@ -7,6 +7,7 @@ URL:            https://github.com/onyxdigitaldev/tp-fanctl
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
+BuildRequires:  systemd-rpm-macros
 Requires:       python3 >= 3.10
 Requires:       thinkfan
 Recommends:     python3-gobject
@@ -68,5 +69,5 @@ EOF
 %{_sysconfdir}/xdg/autostart/tp-fanctl-tray.desktop
 
 %changelog
-* Sun Mar 23 2026 Onyx Digital <dev@onyxdigital.dev> - 1.0.0-1
+* Mon Mar 23 2026 Onyx Digital <dev@onyxdigital.dev> - 1.0.0-1
 - Initial release
