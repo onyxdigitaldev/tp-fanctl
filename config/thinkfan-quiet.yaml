@@ -1,0 +1,27 @@
+##############################################
+# ThinkPad — Balanced Fan Curve
+# Quiet at idle, gradual ramp under load
+#
+# Adjust sensor indices to match your hardware:
+#   Run: find /sys/class/hwmon -name name -exec sh -c 'echo "$(cat {}): $(dirname {})"' \;
+#   Match coretemp indices to your core count
+##############################################
+
+sensors:
+  - hwmon: /sys/class/hwmon
+    name: coretemp
+    indices: [1, 2, 3, 4, 5]
+
+fans:
+  - tpacpi: /proc/acpi/ibm/fan
+
+levels:
+  - [0, 0, 50]
+  - ["level 1", 47, 55]
+  - ["level 2", 52, 60]
+  - ["level 3", 57, 65]
+  - ["level 4", 62, 70]
+  - ["level 5", 67, 75]
+  - ["level 6", 72, 82]
+  - ["level 7", 78, 88]
+  - ["level disengaged", 85, 255]

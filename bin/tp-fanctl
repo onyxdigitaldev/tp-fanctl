@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""
+tp-fanctl — Adaptive fan controller for ThinkPad laptops
+
+Monitors CPU utilization and switches thinkfan between quiet and
+gaming profiles automatically. Zero dependencies beyond stdlib.
+
+Design principles:
+  - Reads /proc/stat directly — no external tools, no polling overhead
+  - Hysteresis with asymmetric thresholds prevents profile thrashing
+  - Counter decay instead of hard reset absorbs transient spikes/dips
+  - Fast engagement (12s sustained), slow disengagement (30s sustained)
+  - Clean shutdown restores BIOS auto fan control
+  - All state transitions logged to journald via stdout
+"""
+
+import signal
+import subprocess
+import time
+from pathlib import Path
+
+# ── Thresholds ───────────────────────────────────────────
+#
+# ENTER: 4 consecutive samples above 55% = 12 seconds of sustained load
+# EXIT:  10 consecutive samples below 25% = 30 seconds of sustained idle
+#
+# The asymmetry is deliberate — ramp up fast to protect thermals,
+# ramp down slow to survive loading screens and brief pauses.
+
+SAMPLE_INTERVAL = 3
+
+GAMING_ENTER_THRESH = 55
+GAMING_ENTER_COUNT = 4
+
+GAMING_EXIT_THRESH = 25
+GAMING_EXIT_COUNT = 10
+
+# ── Paths ────────────────────────────────────────────────
+
+PROFILE_QUIET = Path("/etc/thinkfan.yaml")
+PROFILE_GAMING = Path("/etc/thinkfan-gaming.yaml")
+PROFILE_ACTIVE = Path("/etc/thinkfan-active.yaml")
+FAN_INTERFACE = Path("/proc/acpi/ibm/fan")
+
+
+class Profile:
+    QUIET = "quiet"
+    GAMING = "gaming"
+
+
+def log(msg: str) -> None:
+    print(f"[tp-fanctl] {msg}", flush=True)
+
+
+def read_cpu_ticks() -> tuple[int, int]:
+    """Read aggregate CPU jiffies from /proc/stat."""
+    with open("/proc/stat") as f:
+        line = f.readline()
+    parts = line.split()
+    ticks = [int(x) for x in parts[1:9]]
+    idle = ticks[3] + ticks[4]
+    total = sum(ticks)
+    return total - idle, total
+
+
+def cpu_percent(prev: tuple[int, int], curr: tuple[int, int]) -> float:
+    """CPU usage between two tick snapshots."""
+    d_active = curr[0] - prev[0]
+    d_total = curr[1] - prev[1]
+    if d_total == 0:
+        return 0.0
+    return (d_active / d_total) * 100.0
+
+
+def switch_profile(target: str) -> bool:
+    """Copy the target profile into the active slot and restart thinkfan."""
+    src = PROFILE_GAMING if target == Profile.GAMING else PROFILE_QUIET
+
+    if not src.exists():
+        log(f"ERROR: profile missing: {src}")
+        return False
+
+    try:
+        subprocess.run(["cp", str(src), str(PROFILE_ACTIVE)], check=True)
+        subprocess.run(["systemctl", "restart", "thinkfan"], check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        log(f"ERROR: profile switch failed: {e}")
+        return False
+
+
+def restore_bios_fan() -> None:
+    """Return fan control to BIOS firmware on shutdown."""
+    try:
+        FAN_INTERFACE.write_text("level auto\n")
+        log("Restored BIOS auto fan control")
+    except (PermissionError, OSError) as e:
+        log(f"WARNING: could not restore BIOS fan: {e}")
+
+
+def main() -> None:
+    state = Profile.QUIET
+    above = 0
+    below = 0
+
+    prev = read_cpu_ticks()
+    time.sleep(SAMPLE_INTERVAL)
+
+    log(f"Started — profile: {state}, "
+        f"enter: {GAMING_ENTER_THRESH}% x{GAMING_ENTER_COUNT}, "
+        f"exit: {GAMING_EXIT_THRESH}% x{GAMING_EXIT_COUNT}")
+
+    running = True
+
+    def shutdown(signum, _frame):
+        nonlocal running
+        log(f"Received {signal.Signals(signum).name}")
+        running = False
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    while running:
+        curr = read_cpu_ticks()
+        usage = cpu_percent(prev, curr)
+        prev = curr
+
+        if state == Profile.QUIET:
+            if usage >= GAMING_ENTER_THRESH:
+                above += 1
+                below = 0
+                if above >= GAMING_ENTER_COUNT:
+                    log(f"Sustained {usage:.0f}% CPU — switching to GAMING")
+                    if switch_profile(Profile.GAMING):
+                        state = Profile.GAMING
+                    above = 0
+            else:
+                above = max(0, above - 1)
+
+        elif state == Profile.GAMING:
+            if usage <= GAMING_EXIT_THRESH:
+                below += 1
+                above = 0
+                if below >= GAMING_EXIT_COUNT:
+                    log(f"Dropped to {usage:.0f}% CPU — switching to QUIET")
+                    if switch_profile(Profile.QUIET):
+                        state = Profile.QUIET
+                    below = 0
+            else:
+                below = max(0, below - 1)
+
+        try:
+            time.sleep(SAMPLE_INTERVAL)
+        except InterruptedError:
+            break
+
+    if state == Profile.GAMING:
+        log("Restoring quiet profile")
+        switch_profile(Profile.QUIET)
+    restore_bios_fan()
+    log("Shutdown complete")
+
+
+if __name__ == "__main__":
+    main()

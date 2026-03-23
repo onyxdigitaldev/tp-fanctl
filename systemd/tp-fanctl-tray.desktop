@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ThinkPad Fan Monitor
+Exec=/usr/local/bin/tp-fanctl-tray
+Icon=preferences-desktop-fan-speed
+Comment=System tray indicator for ThinkPad fan profile
+X-KDE-autostart-phase=2
+X-KDE-autostart-after=panel
+Terminal=false
+Categories=System;Monitor;

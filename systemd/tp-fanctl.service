@@ -1,0 +1,13 @@
+[Unit]
+Description=ThinkPad adaptive fan controller
+After=thinkfan.service
+Requires=thinkfan.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tp-fanctl
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
